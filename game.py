@@ -15,12 +15,24 @@ LINE_WIDTH = 3 # how thick for the line
 SPEED = 100 # should be like 10
 SLEEP = 0.001
 STATION_LIMIT = 3
+TRAIN_PASSENGER_LIMIT = 100
+STATION_PASSENGER_LIMIT = 100
 
 class StationType(int, enum.Enum):
 	Empty = 0
 	Triangle = 1
 	Circle = 2
 	Square = 3
+
+def trainText(t, c, s):
+	text = ''
+	if STATION_LIMIT >= 1:
+		text += 'T: ' + str(t)
+	if STATION_LIMIT >= 2:
+		text += '    C: ' + str(c)
+	if STATION_LIMIT >= 3:
+		text += '\nS: ' + str(s)
+	return text
 
 def buildText(window, block_size, tracks, t, c, s):
 	x = MARGIN
@@ -30,13 +42,7 @@ def buildText(window, block_size, tracks, t, c, s):
 		y_coor = tracks[0][1]
 		x = MARGIN + block_size*x_coor
 		y = MARGIN + block_size*y_coor
-	text = ''
-	if STATION_LIMIT >= 1:
-		text += 'T: ' + str(t)
-	if STATION_LIMIT >= 2:
-		text += '    C: ' + str(c)
-	if STATION_LIMIT >= 3:
-		text += '\nS: ' + str(s)
+	text = trainText(t, c, s)
 	textG = Text(Point(x, y), text)
 	textG.setSize(8)
 	textG.setStyle('bold')
@@ -131,7 +137,7 @@ def buildTextBoxes(window, trains, stations):
 		count = 0
 		for key in stations:
 			s = stations[key]
-			text = stationText(s.station, s.x_coor, s.y_coor, s.num_t, s.num_c, s.num_s)
+			text = stationText(s.station, s.x_coor, s.y_coor, s.n_passengers[0], s.n_passengers[1], s.n_passengers[2])
 			cur = Text(Point(WINDOW_SIZE + 150, 360 + count*20), text)
 			cur.setTextColor(colors[int(s.station) - 1] )
 			cur.draw(window)
@@ -172,22 +178,22 @@ class Train:
 		self.stationsOnLine = {}
 
 	def reset(self):
-		self.curP = 0
-		self.curFrac = 0
-		self.num_t = 0
-		self.num_c = 0
-		self.num_s = 0
 		self.train.undraw()
 		self.train = createTrain(self.window, self.tracks, self.block_size, self.color_ind)
 		self.text.undraw()
 		self.text = buildText(self.window, self.block_size, self.tracks, self.num_t, self.num_c, self.num_s)
 
 	def updateTracks(self, tracks):
+		self.curP = 0
+		self.curFrac = 0
 		self.tracks = tracks
 		self.line = createLine(tracks)
 		for t in self.drawnTracks:
 			t.undraw()
 		self.drawnTracks = colorTracks(self.window, self.tracks, self.block_size, self.color_ind)
+		self.num_t = 0
+		self.num_c = 0
+		self.num_s = 0
 		self.reset()
 
 	def moveTrain(self, dist, curX, curY, nextX, nextY):
@@ -221,34 +227,63 @@ class Train:
 						self.line[(self.curP + 1) % len(self.line)][1])
 			self.curFrac = 1
 
+	def updateText(self):
+		self.text.undraw()
+		self.text.setText(trainText(self.num_t, self.num_c, self.num_s))
+		self.text.draw(self.window)
+
+	def addPassengers(self, t, c, s):
+		if self.num_t + self.num_c + self.num_s + t + c + s <= TRAIN_PASSENGER_LIMIT:
+			self.num_t += t
+			self.num_c += c
+			self.num_s += s
+		else:
+			raise Exception('Exceeded train passenger limit')
+
+	def removePassengers(self, station):
+		if station == StationType.Triangle and self.num_t != 0:
+			self.num_t = 0
+		elif station == StationType.Circle and self.num_c != 0:
+			self.num_c = 0
+		elif station == StationType.Square and self.num_s != 0:
+			self.num_s = 0
+
+	
+
+
 class Station:
 	def __init__(self, x_coor, y_coor, station):
 		self.x_coor = x_coor
 		self.y_coor = y_coor
 		self.station = station
-		self.num_t = 0
-		self.num_c = 0
-		self.num_s = 0
-
-	def getPassengers(self):
-		return self.num_t, self.num_c, self.num_s
+		self.n_passengers = [0, 0, 0] # t, c, s
 
 	def addPassengers(self, t=0, c=0, s=0):
 		if t == 0 and c == 0 and s == 0:
-			self.num_t += random.randint(1, 3)
-			self.num_c += random.randint(1, 3)
-			self.num_s += random.randint(1, 3)
+			for i in range(3):
+				if i != int(self.station):
+					self.n_passengers[i] += random.randint(1, 3)
 		else:
-			self.num_t += t
-			self.num_c += c
-			self.num_s += s
+			if (t == 0 and self.station == StationType.Triangle) or \
+				(c == 0 and self.station == StationType.Circle) or \
+				(s == 0 and self.station == StationType.Square):
+				self.n_passengers[0] += t
+				self.n_passengers[1] += c
+				self.n_passengers[2] += s
+			else:
+				raise Exception('Tried adding an illegal passenger')
 
 	def removePassengers(self, t, c, s):
-		assert t <= self.num_t and c <= self.num_c and s <= self.num_s
+		assert t <= self.n_passengers[0] and c <= self.n_passengers[1] and s <= self.n_passengers[2]
 		assert t >= 0 and c >= 0 and s >= 0
-		self.num_t -= t
-		self.num_c -= c
-		self.num_s -= s
+		if (t == 0 and self.station == StationType.Triangle) or \
+			(c == 0 and self.station == StationType.Circle) or \
+			(s == 0 and self.station == StationType.Square):
+			self.n_passengers[0] -= t
+			self.n_passengers[1] -= c
+			self.n_passengers[2] -= s
+		else:
+			raise Exception('Tried removing an illegal passenger')
 
 class AllTrains:
 	def __init__(self, window, block_size, trains={}, trainColors = set()):
@@ -260,7 +295,6 @@ class AllTrains:
 		self.sideline = Sideline(self.window, self.trains, self.stations)
 		self.allColors = set([i for i in range(len(colors))])
 		self.curFrac = 0
-		
 
 	# (x_coor, y_coor) refers to (0, 0) or (1, 2) and this function 
 	# figures out the actual pixel values
@@ -324,11 +358,6 @@ class AllTrains:
 		else:
 			raise Exception('AllTrains: Line does not exist')
 
-	def move(self):
-		self.curFrac = (self.curFrac + 1) % SPEED
-		for i in self.trains:
-			self.trains[i].move()
-
 	def updateTracks(self, tracks, i):
 		self.trains[i].updateTracks(tracks)
 		self.sideline.updateSideline(self.trains, self.stations)
@@ -348,8 +377,58 @@ class AllTrains:
 		else:
 			raise Exception('Station does not exist')
 
+	def maxAdditions(self, train, station):
+		num_t = 0
+		num_c = 0
+		num_s = 0
+		curNum = train.num_t + train.num_c + train.num_s
+		if curNum != TRAIN_PASSENGER_LIMIT:
+			if curNum + station.n_passengers[0] > TRAIN_PASSENGER_LIMIT:
+				curNum = TRAIN_PASSENGER_LIMIT
+				num_t += (TRAIN_PASSENGER_LIMIT - curNum)
+			else:
+				curNum += station.n_passengers[0]
+				num_t = station.n_passengers[0]
+
+			if curNum + station.n_passengers[1] > TRAIN_PASSENGER_LIMIT:
+				curNum = TRAIN_PASSENGER_LIMIT
+				num_c += (TRAIN_PASSENGER_LIMIT - curNum)
+			else:
+				curNum += station.n_passengers[1]
+				num_c = station.n_passengers[1]
+
+			if curNum + station.n_passengers[2] > TRAIN_PASSENGER_LIMIT:
+				curNum = TRAIN_PASSENGER_LIMIT
+				num_s += (TRAIN_PASSENGER_LIMIT - curNum)
+			else:
+				curNum += station.n_passengers[2]
+				num_s = station.n_passengers[2]
+		return num_t, num_c, num_s
 
 
+	def checkForPassengers(self):
+		for key in self.trains:
+			t = self.trains[key]
+			(curX, curY) = t.line[t.curP]
+			if (curX, curY) in self.stations:
+				s = self.stations[(curX, curY)]
+				t.removePassengers(s.station)
+				num_t, num_c, num_s = self.maxAdditions(t, s)
+				print(curX, curY, num_t, num_c, num_s)
+				s.removePassengers(num_t, num_c, num_s)
+				t.addPassengers(num_t, num_c, num_s)
+				t.updateText()
+		self.sideline.updateSideline(self.trains, self.stations)
+
+
+
+	def move(self):
+		self.curFrac = (self.curFrac + 1) % SPEED
+		if self.curFrac == 0:
+			print('wow')
+			self.checkForPassengers()
+		for i in self.trains:
+			self.trains[i].move()
 
 def loadGrid(window, n):
 	outer_grid = Rectangle(Point(MARGIN, MARGIN), \
@@ -367,23 +446,25 @@ def main():
 	window = GraphWin("MiniMetro", WINDOW_SIZE + 400, WINDOW_SIZE)
 	block_size = loadGrid(window, 4)
 	allTrains = AllTrains(window, block_size)
-	allTrains.addStation(0, 2, StationType.Circle)
 	allTrains.addStation(1, 3, StationType.Triangle)
+	allTrains.addStation(0, 2, StationType.Circle)
 	allTrains.addStation(2, 1, StationType.Square)
 	# print(allTrains.stations)
 	tracks = [(0, 1), (0, 2), (0, 3), (1, 3), (1, 2), (1, 1), (2, 1), (2, 0)]
 	# tracks2 = [(1, 1), (2, 1), (2, 0), (3, 0), (3, 1)]
 	allTrains.createNewLine(tracks, 5)
 	# allTrains.createNewLine(tracks2, 6)
-	count = 0
+	count = 1
 	while(True): # for i in range(200):
 		# time.sleep(SLEEP)
 		allTrains.move()
-		count = (count + 1) % 400
-		if count % 400 == 0:
-			allTrains.addPassengersToStation(0, 2)
-			allTrains.addPassengersToStation(1, 3, 2, 0, 1)
-			allTrains.addPassengersToStation(2, 1, 1, 1, 1)
+		# if len(allTrains.trainColors) < len(colors):
+		# 	allTrains.createNewLine([(0,0),(0,1)])
+		count = (count + 1) % 200
+		if count % 200 == 0:
+			# allTrains.addPassengersToStation(0, 2)
+			allTrains.addPassengersToStation(1, 3, 0, 2, 1)
+			allTrains.addPassengersToStation(2, 1, 1, 1, 0)
 
 	# allTrains.updateTracks([(0, 0), (1, 0), (2, 0), (2, 1)], 5)
 	
