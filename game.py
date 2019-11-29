@@ -12,11 +12,11 @@ colors = ['red', 'blue', 'green', 'brown', 'yellow', 'purple', \
 TRAIN_LENGTH = 50
 TRAIN_WIDTH = 25
 LINE_WIDTH = 3 # how thick for the line
-SPEED = 10
+SPEED = 100 # should be like 10
 SLEEP = 0.001
 STATION_LIMIT = 3
 
-class Station(int, enum.Enum):
+class StationType(int, enum.Enum):
 	Empty = 0
 	Triangle = 1
 	Circle = 2
@@ -101,7 +101,24 @@ def textForTextBox(color_ind, t, c, s):
 		text += '      S: ' + str(s)
 	return text
 
-def buildTextBoxes(window, trains):
+def stationText(stationType, x, y, t, c, s):
+	text = ''
+	if stationType == StationType.Triangle:
+		text = 'Triangle'
+	elif stationType == StationType.Circle:
+		text = 'Circle'
+	elif stationType == StationType.Square:
+		text = 'Square'
+	text += ' Station (' + str(x) + ', ' + str(y) + '):     '
+	if STATION_LIMIT >= 1:
+		text += 'T: ' + str(t)
+	if STATION_LIMIT >= 2:
+		text += '      C: ' + str(c)
+	if STATION_LIMIT >= 3:
+		text += '      S: ' + str(s)
+	return text
+
+def buildTextBoxes(window, trains, stations):
 	textBoxes = []
 	for l in trains:
 		text = textForTextBox(trains[l].color_ind, trains[l].num_t, \
@@ -110,20 +127,32 @@ def buildTextBoxes(window, trains):
 		cur.setTextColor(colors[trains[l].color_ind])
 		cur.draw(window)
 		textBoxes.append(cur)
+	if stations != None:
+		count = 0
+		for key in stations:
+			s = stations[key]
+			text = stationText(s.station, s.x_coor, s.y_coor, s.num_t, s.num_c, s.num_s)
+			cur = Text(Point(WINDOW_SIZE + 150, 360 + count*20), text)
+			cur.setTextColor(colors[int(s.station) - 1] )
+			cur.draw(window)
+			textBoxes.append(cur)
+			count += 1
 	return textBoxes
 
 class Sideline:
-	def __init__(self, window, trains={}):
+	def __init__(self, window, trains={}, stations=None):
 		self.trains = trains
 		self.window = window
-		self.textBoxes = buildTextBoxes(self.window, self.trains)
+		self.stations = stations
+		self.textBoxes = buildTextBoxes(self.window, self.trains, self.stations)
 		createHeader(self.window)
 
-	def updateSideline(self, trains):
+	def updateSideline(self, trains, stations=None):
 		self.trains = trains
+		self.stations = stations
 		for l in self.textBoxes:
 			l.undraw()
-		self.textBoxes = buildTextBoxes(self.window, self.trains)
+		self.textBoxes = buildTextBoxes(self.window, self.trains, self.stations)
 
 class Train:
 	def __init__(self, tracks, color_ind, window, block_size):
@@ -140,6 +169,7 @@ class Train:
 		self.num_s = 0
 		self.drawnTracks = colorTracks(self.window, self.tracks, self.block_size, self.color_ind)
 		self.text = buildText(self.window, self.block_size, self.tracks, self.num_t, self.num_c, self.num_s)
+		self.stationsOnLine = {}
 
 	def reset(self):
 		self.curP = 0
@@ -191,6 +221,34 @@ class Train:
 						self.line[(self.curP + 1) % len(self.line)][1])
 			self.curFrac = 1
 
+class Station:
+	def __init__(self, x_coor, y_coor, station):
+		self.x_coor = x_coor
+		self.y_coor = y_coor
+		self.station = station
+		self.num_t = 0
+		self.num_c = 0
+		self.num_s = 0
+
+	def getPassengers(self):
+		return self.num_t, self.num_c, self.num_s
+
+	def addPassengers(self, t=0, c=0, s=0):
+		if t == 0 and c == 0 and s == 0:
+			self.num_t += random.randint(1, 3)
+			self.num_c += random.randint(1, 3)
+			self.num_s += random.randint(1, 3)
+		else:
+			self.num_t += t
+			self.num_c += c
+			self.num_s += s
+
+	def removePassengers(self, t, c, s):
+		assert t <= self.num_t and c <= self.num_c and s <= self.num_s
+		assert t >= 0 and c >= 0 and s >= 0
+		self.num_t -= t
+		self.num_c -= c
+		self.num_s -= s
 
 class AllTrains:
 	def __init__(self, window, block_size, trains={}, trainColors = set()):
@@ -198,31 +256,36 @@ class AllTrains:
 		self.block_size = block_size
 		self.trains = trains
 		self.trainColors = trainColors
-		self.sideline = Sideline(self.window, self.trains)
-		self.allColors = set([i for i in range(len(colors))])
 		self.stations = {}
+		self.sideline = Sideline(self.window, self.trains, self.stations)
+		self.allColors = set([i for i in range(len(colors))])
+		self.curFrac = 0
+		
+
 	# (x_coor, y_coor) refers to (0, 0) or (1, 2) and this function 
 	# figures out the actual pixel values
 	def addStation(self, x_coor, y_coor, station):
-		x = MARGIN + self.block_size*x_coor
-		y = MARGIN + self.block_size*y_coor
-		if station == Station.Triangle:
-			t = Polygon(Point(x, y-10), Point(x-10, y+10), Point(x+10, y+10))
-			t.setFill('red')
-			t.draw(self.window)
-			self.stations[(x_coor, y_coor)] = Station.Triangle
-		elif station == Station.Circle:
-			c = Circle(Point(x,y), 10)
-			c.setFill('blue')
-			c.draw(self.window)
-			self.stations[(x_coor, y_coor)] = Station.Circle
-		elif station == Station.Square:
-			s = Rectangle(Point(x-10, y-10), Point(x+10, y+10))
-			s.setFill('green')
-			s.draw(self.window)
-			self.stations[(x_coor, y_coor)] = Station.Square
+		if (x_coor, y_coor) not in self.stations:
+			x = MARGIN + self.block_size*x_coor
+			y = MARGIN + self.block_size*y_coor
+			if station == StationType.Triangle:
+				t = Polygon(Point(x, y-10), Point(x-10, y+10), Point(x+10, y+10))
+				t.setFill('red')
+				t.draw(self.window)
+			elif station == StationType.Circle:
+				c = Circle(Point(x,y), 10)
+				c.setFill('blue')
+				c.draw(self.window)
+			elif station == StationType.Square:
+				s = Rectangle(Point(x-10, y-10), Point(x+10, y+10))
+				s.setFill('green')
+				s.draw(self.window)
+			else:
+				raise Exception('Wrong Station Type')
+			s = Station(x_coor, y_coor, station)
+			self.stations[(x_coor, y_coor)] = s
 		else:
-			raise Exception('Wrong Station Type')
+			raise Exception('Station already exists at that location')
 
 	def resetLines(self):
 		for i in self.trains:
@@ -240,14 +303,14 @@ class AllTrains:
 			curTrain = Train(tracks, i, self.window, self.block_size)
 			self.trainColors.add(i)
 			self.trains[i] = curTrain
-			self.sideline.updateSideline(self.trains)
+			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
 		elif i == None and len(self.trains) < len(colors):
 			curColor = self.randNewColor()
 			curTrain = Train(tracks, curColor, self.window, self.block_size)
 			self.trainColors.add(curColor)
 			self.trains[curColor] = curTrain
-			self.sideline.updateSideline(self.trains)
+			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
 		else:
 			raise Exception('AllTrains: Max Lines have been reached')
@@ -256,19 +319,34 @@ class AllTrains:
 		if i in self.trainColors:
 			self.trainColors.remove(i)
 			del self.trains[curColor]
-			self.sideline.updateSideline(self.trains)
+			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
 		else:
 			raise Exception('AllTrains: Line does not exist')
 
 	def move(self):
+		self.curFrac = (self.curFrac + 1) % SPEED
 		for i in self.trains:
 			self.trains[i].move()
 
 	def updateTracks(self, tracks, i):
 		self.trains[i].updateTracks(tracks)
-		self.sideline.updateSideline(self.trains)
+		self.sideline.updateSideline(self.trains, self.stations)
 		self.resetLines()
+
+	def addPassengersToStation(self, x_coor, y_coor, t=0, c=0, s=0):
+		if (x_coor, y_coor) in self.stations:
+			self.stations[(x_coor, y_coor)].addPassengers(t, c, s)
+			self.sideline.updateSideline(self.trains, self.stations)
+		else:
+			raise Exception('Station does not exist')
+
+	def removePassengersFromStation(self, x_coor, y_coor, t, c, s):
+		if (x_coor, y_coor) in self.stations:
+			self.stations[(x_coor, y_coor)].removePassengers(t, c, s)
+			self.sideline.updateSideline(self.trains, self.stations)
+		else:
+			raise Exception('Station does not exist')
 
 
 
@@ -289,18 +367,33 @@ def main():
 	window = GraphWin("MiniMetro", WINDOW_SIZE + 400, WINDOW_SIZE)
 	block_size = loadGrid(window, 4)
 	allTrains = AllTrains(window, block_size)
-	allTrains.addStation(0, 2, Station.Circle)
-	allTrains.addStation(1, 3, Station.Triangle)
-	allTrains.addStation(2, 1, Station.Square)
-	print(allTrains.stations)
-	tracks = [(0, 0), (0, 1), (1, 1), (1, 2), (1, 3)]
-	tracks2 = [(1, 1), (2, 1), (2, 0), (3, 0), (3, 1)]
+	allTrains.addStation(0, 2, StationType.Circle)
+	allTrains.addStation(1, 3, StationType.Triangle)
+	allTrains.addStation(2, 1, StationType.Square)
+	# print(allTrains.stations)
+	tracks = [(0, 1), (0, 2), (0, 3), (1, 3), (1, 2), (1, 1), (2, 1), (2, 0)]
+	# tracks2 = [(1, 1), (2, 1), (2, 0), (3, 0), (3, 1)]
 	allTrains.createNewLine(tracks, 5)
-	allTrains.createNewLine(tracks2, 6)
-	for i in range(200):
+	# allTrains.createNewLine(tracks2, 6)
+	count = 0
+	while(True): # for i in range(200):
 		# time.sleep(SLEEP)
 		allTrains.move()
-	allTrains.updateTracks([(0, 0), (1, 0), (2, 0), (2, 1)], 5)
+		count = (count + 1) % 400
+		if count % 400 == 0:
+			allTrains.addPassengersToStation(0, 2)
+			allTrains.addPassengersToStation(1, 3, 2, 0, 1)
+			allTrains.addPassengersToStation(2, 1, 1, 1, 1)
+
+	# allTrains.updateTracks([(0, 0), (1, 0), (2, 0), (2, 1)], 5)
+	
+
+
+
+
+
+
+
 	count = 0
 	while(True):
 		# time.sleep(SLEEP/len(trains))
