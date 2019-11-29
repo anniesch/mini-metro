@@ -192,13 +192,14 @@ class MiniMetroGame:
 		return self.getDim(), self.getLines(), self.getTracks(), self.getStations(), self.getNumStations()
 
 
-	def reward(self, state, a):
+	def reward(self, state, action):
 		reward = 0
 		if action < len(self.pair_to_index.keys()): # action is to add line	
 			reward -= 1
 		else: # action is to remove line
 			reward -= 2
 		# Add distance to passengers as negative reward!!
+		return reward
 
 
 	def init_station_pairs(self):
@@ -290,12 +291,13 @@ class MiniMetroGame:
 			if action < len(self.pair_to_index.keys()): # action is to add line	
 				pair = self.index_to_pair[action]
 				self.createLine(pair[0], pair[1])
-				new_state = state + 2**action
+				new_state = state + 2**action - 1
 			else: # action is to remove line
 				pair = self.index_to_pair[action - len(self.index_to_pair.keys())]
 				self.removeLine(pair[0], pair[1])
 				action -= len(self.index_to_pair.keys())
-				new_state = state - 2**action
+				new_state = state - 2**action - 1
+				#print("ACTION,", action, new_state)
 		else: # with prob 0.3, no action is taken (due to regulations)
 			new_state = state
 		return new_state
@@ -316,7 +318,7 @@ class MiniMetroGame:
 		episode_rewards = np.zeros(num_episodes)
 		for i in range(num_episodes):
 			t = 0
-			while t < 20:
+			while t < 10:
 				for curr_state_index in range(2**len(self.station_pairs)): # j is the state
 					# Handle current state
 					bin_j = bin(curr_state_index) # binary j
