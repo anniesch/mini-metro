@@ -10,7 +10,8 @@ colors = ['red', 'blue', 'green', 'brown', 'yellow', 'purple', \
 TRAIN_LENGTH = 50
 TRAIN_WIDTH = 25
 LINE_WIDTH = 3 # how thick for the line
-SPEED = 2
+
+SPEED = 20
 SLEEP = 0.00001
 STATION_LIMIT = 3
 
@@ -237,6 +238,9 @@ def main():
 		train3.move()
 	train.updateTracks([(0, 0), (1, 0), (2, 0), (2, 1)])
 	trains = [train, train2, train3]
+
+	train.updateTracks([(0, 0), (1, 0), (2, 0), (2, 1)])
+	trains = [train, train2]
 	sideline.updateSideline(trains)
 	while(True):
 		# time.sleep(SLEEP/len(trains))
