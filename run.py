@@ -14,9 +14,12 @@ def tryThings():
 	# print(maxNumLines)
 	# print(len(tracks))
 
-	newGame.addStation(enum_point(0, 0, dim), Station.Triangle)
-	newGame.addStation(enum_point(0, 2, dim), Station.Triangle)
-	newGame.addStation(enum_point(1, 1, dim), Station.Circle)
+	# newGame.addStation(enum_point(0, 0, dim), Station.Triangle)
+	# newGame.addStation(enum_point(0, 2, dim), Station.Triangle)
+	# newGame.addStation(enum_point(1, 1, dim), Station.Circle)
+	newGame.addStation((0,0), Station.Triangle)
+	newGame.addStation((0,2), Station.Triangle)
+	newGame.addStation((1,2), Station.Circle)
 	newGame.addLine()
 	newGame.addLine()
 	newGame.addTrackToLine(1, enum_point(0, 1, dim), enum_point(0, 0, dim))
@@ -35,6 +38,8 @@ def tryThings():
 	print('num stations:', newGame.getNumStations())
 	print('tracks utilized:', newGame.getTotalTracksUtilized())
 	print('tracks covered:', newGame.getTotalTracksCovered())
+
+	newGame.qlearning()
 
 def main():
 	print('do real stuff here')
