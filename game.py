@@ -12,7 +12,7 @@ colors = ['red', 'blue', 'green', 'brown', 'yellow', 'purple', \
 TRAIN_LENGTH = 50
 TRAIN_WIDTH = 25
 LINE_WIDTH = 3 # how thick for the line
-SPEED = 100 # should be like 10
+SPEED = 50 # should be like 10
 SLEEP = 0.001
 STATION_LIMIT = 3
 TRAIN_PASSENGER_LIMIT = 100
@@ -175,7 +175,20 @@ class Train:
 		self.num_s = 0
 		self.drawnTracks = colorTracks(self.window, self.tracks, self.block_size, self.color_ind)
 		self.text = buildText(self.window, self.block_size, self.tracks, self.num_t, self.num_c, self.num_s)
-		self.stationsOnLine = {}
+							#  tri     cir    squ
+		self.stationsOnLine = [False, False, False]
+
+	def updateStationsBool(self, stations):
+		self.stationsOnLine = [False, False, False]
+		for t in self.tracks:
+			if t in stations:
+				s = stations[t]
+				if s.station == StationType.Triangle:
+					self.stationsOnLine[0] = True
+				elif s.station == StationType.Circle:
+					self.stationsOnLine[1] = True
+				elif s.station == StationType.Square:
+					self.stationsOnLine[2] = True
 
 	def reset(self):
 		self.train.undraw()
@@ -273,10 +286,10 @@ class Station:
 	def addPassengers(self, t=0, c=0, s=0):
 		if t == 0 and c == 0 and s == 0:
 			nums = [0, 0, 0]
-			for i in range(3):
+			for i in range(1, 4):
 				if i != int(self.station):
-					nums[i] = random.randint(1, 3)
-					self.n_passengers[i] += nums[i]
+					nums[i - 1] = random.randint(1, 3)
+					self.n_passengers[i - 1] += nums[i - 1]
 
 		else:
 			if (t == 0 and self.station == StationType.Triangle) or \
@@ -364,6 +377,7 @@ class AllTrains:
 			self.trains[i] = curTrain
 			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
+			self.trains[i].updateStationsBool(self.stations)
 		elif i == None and len(self.trains) < len(colors):
 			curColor = self.randNewColor()
 			curTrain = Train(tracks, curColor, self.window, self.block_size)
@@ -371,8 +385,10 @@ class AllTrains:
 			self.trains[curColor] = curTrain
 			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
+			self.trains[i].updateStationsBool(self.stations)
 		else:
 			raise Exception('AllTrains: Max Lines have been reached')
+
 
 	def removeLine(self, i):
 		if i in self.trainColors:
@@ -387,6 +403,7 @@ class AllTrains:
 		self.trains[i].updateTracks(tracks)
 		self.sideline.updateSideline(self.trains, self.stations)
 		self.resetLines()
+		self.trains[i].updateStationsBool(self.stations)
 
 	def addPassengersToStation(self, x_coor, y_coor, t=0, c=0, s=0):
 		if (x_coor, y_coor) in self.stations:
@@ -408,26 +425,29 @@ class AllTrains:
 		num_s = 0
 		curNum = train.num_t + train.num_c + train.num_s
 		if curNum != TRAIN_PASSENGER_LIMIT:
-			if curNum + station.n_passengers[0] > TRAIN_PASSENGER_LIMIT:
-				curNum = TRAIN_PASSENGER_LIMIT
-				num_t += (TRAIN_PASSENGER_LIMIT - curNum)
-			else:
-				curNum += station.n_passengers[0]
-				num_t = station.n_passengers[0]
+			if train.stationsOnLine[0] == True:
+				if curNum + station.n_passengers[0] > TRAIN_PASSENGER_LIMIT:
+					curNum = TRAIN_PASSENGER_LIMIT
+					num_t += (TRAIN_PASSENGER_LIMIT - curNum)
+				else:
+					curNum += station.n_passengers[0]
+					num_t = station.n_passengers[0]
 
-			if curNum + station.n_passengers[1] > TRAIN_PASSENGER_LIMIT:
-				curNum = TRAIN_PASSENGER_LIMIT
-				num_c += (TRAIN_PASSENGER_LIMIT - curNum)
-			else:
-				curNum += station.n_passengers[1]
-				num_c = station.n_passengers[1]
+			if train.stationsOnLine[1] == True:
+				if curNum + station.n_passengers[1] > TRAIN_PASSENGER_LIMIT:
+					curNum = TRAIN_PASSENGER_LIMIT
+					num_c += (TRAIN_PASSENGER_LIMIT - curNum)
+				else:
+					curNum += station.n_passengers[1]
+					num_c = station.n_passengers[1]
 
-			if curNum + station.n_passengers[2] > TRAIN_PASSENGER_LIMIT:
-				curNum = TRAIN_PASSENGER_LIMIT
-				num_s += (TRAIN_PASSENGER_LIMIT - curNum)
-			else:
-				curNum += station.n_passengers[2]
-				num_s = station.n_passengers[2]
+			if train.stationsOnLine[2] == True:
+				if curNum + station.n_passengers[2] > TRAIN_PASSENGER_LIMIT:
+					curNum = TRAIN_PASSENGER_LIMIT
+					num_s += (TRAIN_PASSENGER_LIMIT - curNum)
+				else:
+					curNum += station.n_passengers[2]
+					num_s = station.n_passengers[2]
 		return num_t, num_c, num_s
 
 
@@ -479,7 +499,11 @@ def main():
 	# print(allTrains.stations)
 	tracks = [(0, 1), (0, 2), (0, 3), (1, 3), (1, 2), (1, 1), (2, 1), (2, 0)]
 	# tracks2 = [(1, 1), (2, 1), (2, 0), (3, 0), (3, 1)]
+	tracks3 = [(0, 2), (1, 2), (1, 3)]
+	tracks4 = [(0, 2), (0, 1), (1, 1), (2, 1)]
 	allTrains.createNewLine(tracks, 11)
+	allTrains.createNewLine(tracks3, 8)
+	allTrains.createNewLine(tracks4, 9)
 	# allTrains.createNewLine(tracks2, 6)
 	count = 0
 	while(True): # for i in range(200):
@@ -487,9 +511,9 @@ def main():
 		allTrains.move()
 		# if len(allTrains.trainColors) < len(colors):
 		# 	allTrains.createNewLine([(0,0),(0,1)])
-		count = (count + 1) % 200
-		if count % 200 == 0:
-			# allTrains.addPassengersToStation(0, 2)
+		count = (count + 1) % (2*SPEED)
+		if count % (2*SPEED) == 0:
+			allTrains.addPassengersToStation(0, 2)
 			allTrains.addPassengersToStation(1, 3, 0, 2, 1)
 			allTrains.addPassengersToStation(2, 1, 1, 1, 0)
 
