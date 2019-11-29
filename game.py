@@ -311,7 +311,6 @@ def main():
 		if count % 200 == 0 and len(allTrains.trainColors) < len(colors):
 			allTrains.createNewLine(tracks)
 			allTrains.removeLine()
-
 	window.close()    # Close window when done
 
 
