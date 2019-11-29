@@ -213,39 +213,51 @@ class Train:
 			raise Exception('Wrong Coordinates')
 		
 	def move(self):
-		if self.curFrac != SPEED:
-			self.moveTrain(self.block_size/SPEED, \
-						self.line[self.curP][0], self.line[self.curP][1], \
-						self.line[(self.curP + 1) % len(self.line)][0], \
-						self.line[(self.curP + 1) % len(self.line)][1])
-			self.curFrac += 1
-		else:
+		self.moveTrain(self.block_size/SPEED, \
+					self.line[self.curP][0], self.line[self.curP][1], \
+					self.line[(self.curP + 1) % len(self.line)][0], \
+					self.line[(self.curP + 1) % len(self.line)][1])
+		self.curFrac += 1
+		if self.curFrac == SPEED:
+			self.curFrac = 0
 			self.curP = (self.curP + 1) % len(self.line)
-			self.moveTrain(self.block_size/SPEED, \
-						self.line[self.curP][0], self.line[self.curP][1], \
-						self.line[(self.curP + 1) % len(self.line)][0], \
-						self.line[(self.curP + 1) % len(self.line)][1])
-			self.curFrac = 1
 
 	def updateText(self):
 		self.text.undraw()
 		self.text.setText(trainText(self.num_t, self.num_c, self.num_s))
 		self.text.draw(self.window)
 
-	def addPassengers(self, t, c, s):
+	def addPassengers(self, t, c, s, station):
 		if self.num_t + self.num_c + self.num_s + t + c + s <= TRAIN_PASSENGER_LIMIT:
 			self.num_t += t
 			self.num_c += c
 			self.num_s += s
+			sType = 'Triangle'
+			if station == StationType.Circle:
+				sType = 'Circle'
+			elif station == StationType.Square:
+				sType = 'Square'
+			if t == 0 and c == 0 and s == 0:
+				print(colors[self.color_ind] + ' Line picked up no passengers at ' + sType + ' station (' + str(self.line[self.curP][0]) + ', ' + str(self.line[self.curP][1]) + ')')
+			else:
+				print(colors[self.color_ind] + ' Line picked up ' + str(t) + \
+					' triangle, ' + str(c) + ' circle, and ' \
+					+ str(s) + ' square passengers at ' + sType + ' station (' + str(self.line[self.curP][0]) + ', ' + str(self.line[self.curP][1]) + ')')
 		else:
 			raise Exception('Exceeded train passenger limit')
 
 	def removePassengers(self, station):
 		if station == StationType.Triangle and self.num_t != 0:
+			print(colors[self.color_ind] + ' Line dropped off ' + str(self.num_t) + \
+				 ' triangle passengers at Triangle station (' + str(self.line[self.curP][0]) + ', ' + str(self.line[self.curP][1]) + ')')
 			self.num_t = 0
 		elif station == StationType.Circle and self.num_c != 0:
+			print(colors[self.color_ind] + ' Line dropped off ' + str(self.num_c) + \
+				 ' circle passengers at Circle station (' + str(self.line[self.curP][0]) + ', ' + str(self.line[self.curP][1]) + ')')
 			self.num_c = 0
 		elif station == StationType.Square and self.num_s != 0:
+			print(colors[self.color_ind] + ' Line dropped off ' + str(self.num_s) + \
+				 ' square passengers at Square station (' + str(self.line[self.curP][0]) + ', ' + str(self.line[self.curP][1]) + ')')
 			self.num_s = 0
 
 	
@@ -260,9 +272,12 @@ class Station:
 
 	def addPassengers(self, t=0, c=0, s=0):
 		if t == 0 and c == 0 and s == 0:
+			nums = [0, 0, 0]
 			for i in range(3):
 				if i != int(self.station):
-					self.n_passengers[i] += random.randint(1, 3)
+					nums[i] = random.randint(1, 3)
+					self.n_passengers[i] += nums[i]
+
 		else:
 			if (t == 0 and self.station == StationType.Triangle) or \
 				(c == 0 and self.station == StationType.Circle) or \
@@ -270,6 +285,15 @@ class Station:
 				self.n_passengers[0] += t
 				self.n_passengers[1] += c
 				self.n_passengers[2] += s
+				if self.station == StationType.Triangle:
+					print('Triangle Station at (' + str(self.x_coor) + ', ' + str(self.y_coor) + ') added ' \
+						+ str(c) + ' circle and ' + str(s) + ' square passengers')
+				elif self.station == StationType.Circle:
+					print('Circle Station at (' + str(self.x_coor) + ', ' + str(self.y_coor) + ') added ' \
+						+ str(t) + ' triangle and ' + str(s) + ' square passengers')
+				elif self.station == StationType.Square:
+					print('Square Station at (' + str(self.x_coor) + ', ' + str(self.y_coor) + ') added ' \
+						+ str(t) + ' triangle and ' + str(c) + ' circle passengers')
 			else:
 				raise Exception('Tried adding an illegal passenger')
 
@@ -295,6 +319,7 @@ class AllTrains:
 		self.sideline = Sideline(self.window, self.trains, self.stations)
 		self.allColors = set([i for i in range(len(colors))])
 		self.curFrac = 0
+		self.timeCount = 0
 
 	# (x_coor, y_coor) refers to (0, 0) or (1, 2) and this function 
 	# figures out the actual pixel values
@@ -414,21 +439,23 @@ class AllTrains:
 				s = self.stations[(curX, curY)]
 				t.removePassengers(s.station)
 				num_t, num_c, num_s = self.maxAdditions(t, s)
-				print(curX, curY, num_t, num_c, num_s)
 				s.removePassengers(num_t, num_c, num_s)
-				t.addPassengers(num_t, num_c, num_s)
-				t.updateText()
+				t.addPassengers(num_t, num_c, num_s, s)
+			t.updateText()
 		self.sideline.updateSideline(self.trains, self.stations)
 
 
 
 	def move(self):
-		self.curFrac = (self.curFrac + 1) % SPEED
 		if self.curFrac == 0:
-			print('wow')
+			print('\n')
+			print('TIME COUNT: ', self.timeCount)
 			self.checkForPassengers()
+			self.timeCount += 1
 		for i in self.trains:
 			self.trains[i].move()
+		self.curFrac = (self.curFrac + 1) % SPEED
+		
 
 def loadGrid(window, n):
 	outer_grid = Rectangle(Point(MARGIN, MARGIN), \
@@ -452,9 +479,9 @@ def main():
 	# print(allTrains.stations)
 	tracks = [(0, 1), (0, 2), (0, 3), (1, 3), (1, 2), (1, 1), (2, 1), (2, 0)]
 	# tracks2 = [(1, 1), (2, 1), (2, 0), (3, 0), (3, 1)]
-	allTrains.createNewLine(tracks, 5)
+	allTrains.createNewLine(tracks, 11)
 	# allTrains.createNewLine(tracks2, 6)
-	count = 1
+	count = 0
 	while(True): # for i in range(200):
 		# time.sleep(SLEEP)
 		allTrains.move()
