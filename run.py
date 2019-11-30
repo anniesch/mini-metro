@@ -40,6 +40,7 @@ def tryThings():
 	print('tracks covered:', newGame.getTotalTracksCovered())
 
 	newGame.qlearning()
+	newGame.baseline()
 
 def main():
 	print('do real stuff here')
