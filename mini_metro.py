@@ -46,14 +46,14 @@ class MiniMetroGame:
 				if r + 1 != self.dim + 1:
 					curRight = enum_point(r + 1, c, self.dim)
 					self.tracks[(cur, curRight)] = (int(Track.NoTrack), 0)
-		#self.maxNumLines = int(LINES_LIMIT*len(self.tracks))
-		self.maxNumLines = (self.dim ** 2) - 1
+		self.maxNumLines = int(LINES_LIMIT*len(self.tracks))
 		self.totalTracksUtilized = 0 # only increment for the first time we utilize a track
 		self.totalTracksCovered = 0 # this includes double counts if two lines (or even one line) use the same track along its path
 
 		self.all_lines = [] # list of all lists representing lines
-		self.station_pairs = {} # lookup dictionary from (station, station) (of diff types) to 0 or the line list for if a line is built between them
-		self.all_stations = {} #collections.defaultdict(int)
+		self.station_pairs = {} 
+                # lookup dictionary from (station, station) (of diff types) to 0 or the line list for if a line is built between them
+		self.all_stations = collections.defaultdict(int)
 		self.all_passengers = collections.defaultdict(int)
 
 		self.trianglePassengers = set()
@@ -62,7 +62,7 @@ class MiniMetroGame:
 		self.total_passengers_moved = 0
 
 	def addLine_2(self, line):
-		if sum(self.index_to_line.values()) == self.maxNumLines:
+		if len(self.lines) == self.maxNumLines:
 			raise Exception('addLine(): Reached maximum number of lines')
 		newLine = len(self.lines) + 1 # LINES ARE ONE-INDEXED - sorry lol
 		self.lines[newLine] = set(line) # set of tracks
@@ -136,7 +136,7 @@ class MiniMetroGame:
 	# 		self.squareStations.add(point)
 
 	def addStation(self, point, station_type):
-		if point in self.all_stations.keys():
+		if self.all_stations[point] != Station.Empty:
 			#raise Exception('addStation(): Station has already been added')
 			return 0
 		self.all_stations[point] = station_type
@@ -210,11 +210,30 @@ class MiniMetroGame:
 		else: # action is to remove line
 			reward -= 2
 		# Add distance to passengers as negative reward!!
-
+                for  
 		# Just use number of unhappy passengers as negative reward
 		reward -= 2 * len(self.all_passengers)
 		return reward
 
+        def distance_to_travel(self, station, goal):
+                queue = collections.deque([(start, 0)])
+                while len(queue) > 0:
+                        curr, step = queue.popleft()
+                        step += 1
+                        if curr in goal:
+                                return step
+                        for line in self.stationToLines[(station, self.all_stations[station])]:
+                                index = line.index(station)
+                                if index > 0:
+                                        queue.append((line[index-1], step))
+                                if index < len(line) - 1:
+                                        queue.append((line[index+1], step))
+                return -1
+                                
+
+
+
+                
 
 	def init_station_pairs(self):
 		self.station_pairs = collections.defaultdict(int)
@@ -237,7 +256,7 @@ class MiniMetroGame:
 	def init_states(self):
 		self.index_to_pair = {}
 		self.pair_to_index = {}
-		self.index_to_line = {} # 1 if exists a line, 0 if doesn't
+		self.index_to_line = {}
 		print("Station pairs", self.station_pairs)
 		for i, pair in enumerate(self.station_pairs):
 			self.index_to_pair[i] = pair
@@ -288,21 +307,19 @@ class MiniMetroGame:
 	def pos_actions(self, state):
 		# returns a list of possible actions from a state: tuples of (track added/removed, and corresponding new state)
 		actions = []
-		
 		# If not at the max num of lines and train tracks allowed, can add a line
-		#if sum(self.index_to_line.values()) < self.maxNumLines:
-		# Can add line
-		# Check which station pairs don't have lines already
-		for pair in state.keys():
-			if not state[pair]: # doesn't have line already
-				# add line
-				if sum(self.index_to_line.values()) < self.maxNumLines:
+		if len(self.lines.keys()) < self.maxNumLines:
+			# Can add line
+			# Check which station pairs don't have lines already
+			for pair in state.keys():
+				if not state[pair]: # doesn't have line already
+					# add line
 					actions.append(self.pair_to_index[pair]) # adding action is between 0 and num+pairs - 1
-			else:
-				# Can also remove an existing line
-				actions.append(self.pair_to_index[pair] + len(self.pair_to_index.keys()))
+				else:
+					# Can also remove an existing line
+					actions.append(self.pair_to_index[pair] + len(self.pair_to_index.keys()))
 		# Can also do nothing
-		actions.append(2 * len(self.pair_to_index.keys()))
+		actions.append(2 * len(self.pair_to_index.keys()) + 1)
 		return actions
 
 
@@ -310,17 +327,18 @@ class MiniMetroGame:
 		# returns a list of transition probabilities for each state given an action and an original state
 		rand_num = np.random.uniform()
 		new_state = 0
-		if action == 2 * len(self.pair_to_index.keys()): # action is to do nothing
+		if action > 2 * len(self.pair_to_index.keys()): # action is to do nothing
 			return state
 		if rand_num < 0.7: # with prob 0.7, the correct action is executed			
 			if action < len(self.pair_to_index.keys()): # action is to add line	
 				pair = self.index_to_pair[action]
 				self.createLine(pair[0], pair[1])
-				new_state = state + 2**action
+				new_state = state + 2**action - 1
 			else: # action is to remove line
 				pair = self.index_to_pair[action - len(self.index_to_pair.keys())]
 				self.removeLine(pair[0], pair[1])
-				new_state = state - 2**(action - len(self.index_to_pair.keys()))
+				action -= len(self.index_to_pair.keys())
+				new_state = state - 2**action - 1
 				#print("ACTION,", action, new_state)
 		else: # with prob 0.3, no action is taken (due to regulations)
 			new_state = state
@@ -330,7 +348,7 @@ class MiniMetroGame:
 		# randomly adds a passenger (with type) to one of the stations
 		# distance to nearest station type adds to negative reward
 		point = random.choice(list(self.all_stations.items()))
-		station_type = self.all_stations[point[0]]
+		station_type = self.all_stations[point]
 		type_point = np.random.choice([Station.Triangle, Station.Square, Station.Circle])
 		while type_point == station_type:
 			type_point = np.random.choice([Station.Triangle, Station.Square, Station.Circle])
@@ -346,7 +364,7 @@ class MiniMetroGame:
 		# remove all passengers that will have achieved their destination 
 		# (i.e. there is a line between their station and a desired station)
 		passenger_type = self.all_passengers[passenger]
-		curr_station_type = self.all_stations[passenger[0]]
+		curr_station_type = self.all_stations[passenger]
 		
 		# check if there is a line, if so then remove from self.passengers
 		# want line between curr_station_type and any passenger_type station
@@ -411,15 +429,11 @@ class MiniMetroGame:
 		self.trianglePassengers = set()
 		self.circlePassengers = set()
 		self.squarePassengers = set()
-		self.all_passengers = {}
+		self.all_passengers = collections.defaultdict(int)
 		self.total_passengers_moved = 0
 		new_passengers = np.random.randint(2, (self.dim**2)/2 + 1)
 		for i in range(new_passengers):
 			self.add_passenger()
-
-		self.index_to_line = {} # 1 if exists a line, 0 if doesn't
-		for i, pair in enumerate(self.station_pairs):
-			self.index_to_line[i] = 0 # start out with no lines
 
 
 	def qlearning(self):
@@ -429,33 +443,26 @@ class MiniMetroGame:
 		# Initialize Q table, learning rate
 		learning_rate = 0.8
 		discount = 0.98
-		self.Q = np.zeros((2**(len(self.station_pairs)+2) + 1, 2 * len(self.station_pairs) + 1)) # each station pair can have a line or not
+		self.Q = np.zeros((2**len(self.station_pairs), 2 * len(self.station_pairs) + 2)) # each station pair can have a line or not
 
 		# Training
 		# track state by number of zeroes/which station pairs have lines between them
 		# state s = number in binary, i.e. sum 2^i for each station pair i 
-		num_episodes = 300
+		num_episodes = 100
 		episode_rewards = np.zeros(num_episodes)
 		passengers_moved = np.zeros(num_episodes) # successful passengers
 		passengers_left = np.zeros(num_episodes) # unsuccessful passengers
 		for i in range(num_episodes):
 			self.reset()
-			#print("ALLSTATIONS", self.all_stations)
 			curr_state_index = 0
-			for k in range(200):
+			for k in range(50):
 				# Handle current state
 				bin_j = bin(curr_state_index) # binary j
 				bin_j = bin_j[2:]
 				# get station pairs & existing lines from bin_j
 				curr_state = {}
-				for digit_index in range(0, len(self.station_pairs)):
-					if digit_index < len(str(bin_j)):
-						curr_state[self.index_to_pair[digit_index]] = int(str(bin_j)[digit_index])
-					else:
-						curr_state[self.index_to_pair[digit_index]] = 0
-				# for digit_index in range(0, len(str(bin_j))):
-				# 	curr_state[self.index_to_pair[digit_index]] = int(str(bin_j)[digit_index])
-				#print("CURRSTATE", curr_state_index, curr_state)
+				for digit_index in range(0, len(str(bin_j))):
+					curr_state[self.index_to_pair[digit_index]] = int(str(bin_j)[digit_index])
 
 				# add passengers
 				new_passengers = np.random.randint(0, self.dim)
@@ -464,15 +471,15 @@ class MiniMetroGame:
 
 				# Choose action
 				pos_acts = self.pos_actions(curr_state) # possible actions from the current state (either add or remove line)
-				#print("POSACTS", pos_acts)
 				if len(pos_acts) == 0:
 					break
 				best_next_action = np.argmax(self.Q[curr_state_index, :])
 				if best_next_action not in pos_acts: # if not a possible action
-					best_next_action = np.random.choice(pos_acts) # choose action randomly
+					best_next_action = np.random.choice(pos_acts) # choose action randomly FIX THIS LATER
 				
 				# Take action, observe new state & reward
 				new_state_index = self.transition_probs(curr_state_index, best_next_action)
+
 				# Remove finished passengers
 				self.remove_passengers()
 
@@ -495,21 +502,16 @@ class MiniMetroGame:
 		print("Total passengers moved", passengers_moved)
 		print("Total passengers left", passengers_left)
 		print("Episode rewards: ", episode_rewards)
-		print("Average passengers moved", np.mean(passengers_moved))
-		print("Average episode reward", np.mean(episode_rewards))
-		print("Average passengers left", np.mean(passengers_left))
 		plt.plot(episode_rewards)
 		plt.show()
 
 		# Test Evaluation after Q learning
 
-
-	# Baseline is choosing action randomly
-	def baseline(self):
+	def local_search(self):
 		self.init_station_pairs()
 		self.init_states()
 		# instead of q learning, just chooses randomly what action to take
-		num_episodes = 300
+		num_episodes = 100
 		episode_rewards = np.zeros(num_episodes)
 		passengers_moved = np.zeros(num_episodes) # successful passengers
 		passengers_left = np.zeros(num_episodes) # unsuccessful passengers
@@ -517,7 +519,56 @@ class MiniMetroGame:
 		for i in range(num_episodes):
 			self.reset()
 			curr_state_index = 0
-			for k in range(200):
+			for k in range(50):
+				# Handle current state
+				bin_j = bin(curr_state_index) # binary j
+				bin_j = bin_j[2:]
+				# get station pairs & existing lines from bin_j
+				curr_state = {}
+				for digit_index in range(0, len(str(bin_j))):
+					curr_state[self.index_to_pair[digit_index]] = int(str(bin_j)[digit_index])
+
+				new_passengers = np.random.randint(0, self.dim)
+				for l in range(new_passengers):
+					self.add_passenger()
+
+				pos_acts = self.pos_actions(curr_state) # possible actions from the current state (either add or remove line)
+				if len(pos_acts) == 0:
+					break
+				best_next_action = max([(self.reward(curr_state, action), action) for action in pos_acts])[1]
+
+				new_state_index = self.transition_probs(curr_state_index, best_next_action)
+				# Remove finished passengers
+				self.remove_passengers()
+				reward = self.reward(curr_state, best_next_action)
+				# Set state to the new state
+				curr_state_index = new_state_index
+
+				episode_rewards[i] += reward
+			passengers_moved[i] = self.total_passengers_moved
+			passengers_left[i] = len(self.all_passengers)
+
+		print("BASELINE RESULTS")
+		print("Total passengers moved", passengers_moved)
+		print("Total passengers left", passengers_left)
+		print("Episode rewards: ", episode_rewards)
+		plt.plot(episode_rewards)
+		plt.show()
+
+	# Baseline is choosing action randomly
+	def baseline(self):
+		self.init_station_pairs()
+		self.init_states()
+		# instead of q learning, just chooses randomly what action to take
+		num_episodes = 100
+		episode_rewards = np.zeros(num_episodes)
+		passengers_moved = np.zeros(num_episodes) # successful passengers
+		passengers_left = np.zeros(num_episodes) # unsuccessful passengers
+
+		for i in range(num_episodes):
+			self.reset()
+			curr_state_index = 0
+			for k in range(50):
 				# Handle current state
 				bin_j = bin(curr_state_index) # binary j
 				bin_j = bin_j[2:]
@@ -552,9 +603,6 @@ class MiniMetroGame:
 		print("Total passengers moved", passengers_moved)
 		print("Total passengers left", passengers_left)
 		print("Episode rewards: ", episode_rewards)
-		print("Average passengers moved", np.mean(passengers_moved))
-		print("Average episode reward", np.mean(episode_rewards))
-		print("Average passengers left", np.mean(passengers_left))
 		plt.plot(episode_rewards)
 		plt.show()
 
