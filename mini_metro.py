@@ -435,6 +435,54 @@ class MiniMetroGame:
 		for i, pair in enumerate(self.station_pairs):
 			self.index_to_line[i] = 0 # start out with no lines
 
+	def local_search(self):
+		self.init_station_pairs()
+		self.init_states()
+		# instead of q learning, just chooses randomly what action to take
+		num_episodes = 100
+		episode_rewards = np.zeros(num_episodes)
+		passengers_moved = np.zeros(num_episodes) # successful passengers
+		passengers_left = np.zeros(num_episodes) # unsuccessful passengers
+
+		for i in range(num_episodes):
+			self.reset()
+			curr_state_index = 0
+			for k in range(50):
+				# Handle current state
+				bin_j = bin(curr_state_index) # binary j
+				bin_j = bin_j[2:]
+				# get station pairs & existing lines from bin_j
+				curr_state = {}
+				for digit_index in range(0, len(str(bin_j))):
+					curr_state[self.index_to_pair[digit_index]] = int(str(bin_j)[digit_index])
+
+				new_passengers = np.random.randint(0, self.dim)
+				for l in range(new_passengers):
+					self.add_passenger()
+
+				pos_acts = self.pos_actions(curr_state) # possible actions from the current state (either add or remove line)
+				if len(pos_acts) == 0:
+					break
+				best_next_action = max([(self.reward(curr_state, action), action) for action in pos_acts])[1]
+
+				new_state_index = self.transition_probs(curr_state_index, best_next_action)
+				# Remove finished passengers
+				self.remove_passengers()
+				reward = self.reward(curr_state, best_next_action)
+				# Set state to the new state
+				curr_state_index = new_state_index
+
+				episode_rewards[i] += reward
+			passengers_moved[i] = self.total_passengers_moved
+			passengers_left[i] = len(self.all_passengers)
+
+		print("Local Search RESULTS")
+		print("Total passengers moved", passengers_moved)
+		print("Total passengers left", passengers_left)
+		print("Episode rewards: ", episode_rewards)
+		plt.plot(episode_rewards)
+		plt.savefig('local_search' + str(random.randint(1, 1000)) + '.png')
+
 
 	def qlearning(self):
 		self.init_station_pairs()
@@ -513,7 +561,7 @@ class MiniMetroGame:
 		print("Average episode reward", np.mean(episode_rewards))
 		print("Average passengers left", np.mean(passengers_left))
 		plt.plot(episode_rewards)
-		plt.show()
+		plt.savefig('q_learning' + str(random.randint(1, 1000)) + '.png')
 
 		# Test Evaluation after Q learning
 
@@ -570,7 +618,7 @@ class MiniMetroGame:
 		print("Average episode reward", np.mean(episode_rewards))
 		print("Average passengers left", np.mean(passengers_left))
 		plt.plot(episode_rewards)
-		plt.show()
+		plt.savefig('baseline' + str(random.randint(1, 1000)) + '.png')
 
 
 # def main():
