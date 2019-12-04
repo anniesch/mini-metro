@@ -210,7 +210,7 @@ class MiniMetroGame:
 		else: # action is to remove line
 			reward -= 2
 		# Add distance to passengers as negative reward!!
-                for  
+ 
 		# Just use number of unhappy passengers as negative reward
 		reward -= 2 * len(self.all_passengers)
 		return reward
