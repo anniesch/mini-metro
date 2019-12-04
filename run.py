@@ -1,16 +1,20 @@
 import mini_metro
 from mini_metro import MiniMetroGame, Station, Track
 
+# import mini_metro_graph
+# from mini_metro_graph import MiniMetroGame, Station, Track
+
 def enum_point(r, c, dim):
 	return r*(dim + 1) + c
 
 def de_enum_point(point, dim):
 	return int(point/(dim + 1)), (point % (dim + 1))
 
+
+
 def tryThings():
 	newGame = MiniMetroGame(2, 2) # 2x2 GRID
-	dim, lines, tracks, stations, n_stations = newGame.getState()
-	maxNumLines = newGame.getMaxNumLines()
+	maxNumLines = newGame.maxNumLines
 	# print(maxNumLines)
 	# print(len(tracks))
 
@@ -44,6 +48,7 @@ def tryThings():
 
 	newGame.qlearning()
 	newGame.baseline()
+	newGame.local_search()
 
 def main():
 	print('do real stuff here')

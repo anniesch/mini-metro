@@ -12,7 +12,7 @@ colors = ['red', 'blue', 'green', 'brown', 'yellow', 'purple', \
 TRAIN_LENGTH = 50
 TRAIN_WIDTH = 25
 LINE_WIDTH = 3 # how thick for the line
-SPEED = 25 # should be like 10
+SPEED = 50 # should be like 10
 SLEEP = 0.001
 STATION_LIMIT = 3
 TRAIN_PASSENGER_LIMIT = 100
@@ -196,18 +196,11 @@ class Train:
 		self.text.undraw()
 		self.text = buildText(self.window, self.block_size, self.tracks, self.num_t, self.num_c, self.num_s)
 
-	def updateTracks(self, tracks):
-		self.curP = 0
-		self.curFrac = 0
-		self.tracks = tracks
-		self.line = createLine(tracks)
+	def clear(self):
+		self.train.undraw()
+		self.text.undraw()
 		for t in self.drawnTracks:
 			t.undraw()
-		self.drawnTracks = colorTracks(self.window, self.tracks, self.block_size, self.color_ind)
-		self.num_t = 0
-		self.num_c = 0
-		self.num_s = 0
-		self.reset()
 
 	def moveTrain(self, dist, curX, curY, nextX, nextY):
 		if curX + 1 == nextX and curY == nextY:
@@ -378,6 +371,7 @@ class AllTrains:
 			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
 			self.trains[i].updateStationsBool(self.stations)
+			return i
 		elif i == None and len(self.trains) < len(colors):
 			curColor = self.randNewColor()
 			curTrain = Train(tracks, curColor, self.window, self.block_size)
@@ -386,6 +380,7 @@ class AllTrains:
 			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
 			self.trains[curColor].updateStationsBool(self.stations)
+			return curColor
 		else:
 			raise Exception('AllTrains: Max Lines have been reached')
 
@@ -393,31 +388,26 @@ class AllTrains:
 	def removeLine(self, i):
 		if i in self.trainColors:
 			self.trainColors.remove(i)
-			del self.trains[curColor]
+			self.trains[i].clear()
+			del self.trains[i]
 			self.sideline.updateSideline(self.trains, self.stations)
 			self.resetLines()
 		else:
 			raise Exception('AllTrains: Line does not exist')
 
-	def updateTracks(self, tracks, i):
-		self.trains[i].updateTracks(tracks)
-		self.sideline.updateSideline(self.trains, self.stations)
-		self.resetLines()
-		self.trains[i].updateStationsBool(self.stations)
-
 	def addPassengersToStation(self, x_coor, y_coor, t=0, c=0, s=0):
 		if (x_coor, y_coor) in self.stations:
 			self.stations[(x_coor, y_coor)].addPassengers(t, c, s)
 			self.sideline.updateSideline(self.trains, self.stations)
-		else:
-			raise Exception('Station does not exist')
+		# else:
+		# 	raise Exception('Station does not exist')
 
 	def removePassengersFromStation(self, x_coor, y_coor, t, c, s):
 		if (x_coor, y_coor) in self.stations:
 			self.stations[(x_coor, y_coor)].removePassengers(t, c, s)
 			self.sideline.updateSideline(self.trains, self.stations)
-		else:
-			raise Exception('Station does not exist')
+		# else:
+		# 	raise Exception('Station does not exist')
 
 	def maxAdditions(self, train, station):
 		num_t = 0
@@ -493,34 +483,49 @@ def main():
 	window = GraphWin("MiniMetro", WINDOW_SIZE + 400, WINDOW_SIZE)
 	block_size = loadGrid(window, 4)
 	allTrains = AllTrains(window, block_size)
-	allTrains.addStation(0, 0, StationType.Triangle)
-	allTrains.addStation(0, 2, StationType.Triangle)
-	allTrains.addStation(1, 2, StationType.Circle)
-	allTrains.addStation(2, 3, StationType.Square)
-	allTrains.addStation(1, 3, StationType.Square)
-	tracks = [(0, 0), (1, 0), (2, 0), (2, 1), (2, 2), (2, 3)]
-	tracks2 = [(0, 0), (0, 1), (1, 1), (1, 2)]
-	tracks3 = [(0, 2), (1, 2)]
-	tracks4 = [(0, 2), (0, 3), (1, 3)]
-	tracks5 = [(1, 2), (2, 2), (2, 3)]
-	tracks6 = [(1, 3), (1, 2)]
-	allTrains.createNewLine(tracks, 0)
-	allTrains.createNewLine(tracks2, 1)
-	allTrains.createNewLine(tracks3, 2)
-	allTrains.createNewLine(tracks4, 3)
-	allTrains.createNewLine(tracks5, 4)
-	allTrains.createNewLine(tracks6, 5)
+	allTrains.addStation(1, 3, StationType.Triangle)
+	allTrains.addStation(0, 2, StationType.Circle)
+	allTrains.addStation(2, 1, StationType.Square)
+	# print(allTrains.stations)
+	tracks = [(0, 2), (0, 3), (1, 3), (1, 2), (1, 1), (2, 1)]
+	# tracks2 = [(1, 1), (2, 1), (2, 0), (3, 0), (3, 1)]
+	tracks3 = [(0, 2), (1, 2), (1, 3)]
+	tracks4 = [(0, 2), (0, 1), (1, 1), (2, 1)]
+	allTrains.createNewLine(tracks, 11)
+	allTrains.createNewLine(tracks3, 8)
+	allTrains.createNewLine(tracks4, 9)
+	# allTrains.createNewLine(tracks2, 6)
 	count = 0
 	while(True): # for i in range(200):
 		# time.sleep(SLEEP)
 		allTrains.move()
+		# if len(allTrains.trainColors) < len(colors):
+		# 	allTrains.createNewLine([(0,0),(0,1)])
 		count = (count + 1) % (2*SPEED)
 		if count % (2*SPEED) == 0:
-			allTrains.addPassengersToStation(0, 0)
 			allTrains.addPassengersToStation(0, 2)
-			allTrains.addPassengersToStation(1, 2)
-			allTrains.addPassengersToStation(2, 3)
-			allTrains.addPassengersToStation(1, 3)
+			allTrains.addPassengersToStation(1, 3, 0, 2, 1)
+			allTrains.addPassengersToStation(2, 1, 1, 1, 0)
+
+	
+
+
+
+
+
+
+
+	count = 0
+	while(True):
+		# time.sleep(SLEEP/len(trains))
+		# train.move()
+		# train2.move()
+		allTrains.move()
+		count += 1
+		if count % 200 == 0 and len(allTrains.trainColors) < len(colors):
+			allTrains.createNewLine(tracks)
+			allTrains.removeLine()
+	window.close()    # Close window when done
 
 
 if __name__ == '__main__':
